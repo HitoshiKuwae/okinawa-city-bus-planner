@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>沖縄市循環バス 乗換案内</title>
+  <meta name="theme-color" content="#0f7c72">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="循環バス乗換">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app">
+    <section class="topbar">
+      <div>
+        <p class="eyebrow">Okinawa City Circular Bus</p>
+        <h1>沖縄市循環バス 乗換案内</h1>
+      </div>
+      <div class="status" id="dataStatus">GTFSデータを読み込み中...</div>
+    </section>
+
+    <section class="planner">
+      <div class="form-grid">
+        <label>
+          <span>出発停留所</span>
+          <input id="fromStop" list="stopList" placeholder="例: 中部興産沖縄市役所前" autocomplete="off">
+        </label>
+        <label>
+          <span>到着停留所</span>
+          <input id="toStop" list="stopList" placeholder="例: 泡瀬" autocomplete="off">
+        </label>
+        <label>
+          <span>利用日</span>
+          <input id="serviceDate" type="date">
+        </label>
+        <label>
+          <span>出発時刻</span>
+          <input id="departTime" type="time" step="60">
+        </label>
+      </div>
+      <datalist id="stopList"></datalist>
+
+      <div class="actions">
+        <button id="swapBtn" type="button" title="出発と到着を入れ替え">入替</button>
+        <button id="searchBtn" type="button">最短ルートを検索</button>
+      </div>
+
+      <details class="data-tools">
+        <summary>データ更新・読み込み</summary>
+        <p>
+          公式GTFSの自動取得に失敗する場合は、Transitland掲載の
+          <a href="https://api3.ottop.org/download/gtfs/ooXuXei4op7y/5000020472115" target="_blank" rel="noreferrer">沖縄市循環バス GTFS ZIP</a>
+          をダウンロードしてここへ読み込んでください。
+        </p>
+        <input id="gtfsFile" type="file" accept=".zip,application/zip">
+        <button id="retryBtn" type="button">公式GTFSを再取得</button>
+      </details>
+    </section>
+
+    <section class="results" id="results" aria-live="polite">
+      <div class="empty">
+        出発地・目的地・時刻を選ぶと、乗継候補と移動時間を表示します。
+      </div>
+    </section>
+
+    <section class="notes">
+      <h2>運行メモ</h2>
+      <ul>
+        <li>公式ページでは、北部・中部・西部・東部の4ルートで運行と案内されています。</li>
+        <li>日曜、祝日、1月1日から1月3日は運休、土曜日は1便の運行なしとされています。</li>
+        <li>無料乗継券は「中部興産沖縄市役所前」「BCコザ（市立図書館）」「ミュージックタウン」「美里市営住宅前」↔「美原4丁目」で案内されています。</li>
+        <li>道路状況やイベント迂回で遅れる場合があります。最終判断は現地の案内・運行事業者の情報も確認してください。</li>
+      </ul>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
