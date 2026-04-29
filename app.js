@@ -57,10 +57,10 @@ function init() {
   });
   el.stopFilter.addEventListener("input", renderStopButtons);
   document.querySelectorAll('input[name="timeMode"]').forEach(input => {
-    input.addEventListener("change", () => {
-      el.timeLabel.textContent = getTimeMode() === "arrive" ? "到着時刻" : "出発時刻";
-    });
+    input.addEventListener("change", updateTimeModeLabel);
+    input.closest("label")?.addEventListener("click", () => setTimeout(updateTimeModeLabel, 0));
   });
+  updateTimeModeLabel();
   loadOfficialGtfs();
 }
 
@@ -312,6 +312,7 @@ function updateMapSelection() {
 }
 
 function searchRoute() {
+  updateTimeModeLabel();
   if (!state.feed || !state.graph) {
     showMessage("先にGTFSデータを読み込んでください。");
     return;
@@ -454,41 +455,81 @@ function candidateStartTimes(originId, serviceKey) {
   return [...times].sort((a, b) => a - b);
 }
 
+function findNearestRouteAround(originId, targetId, requestedAt, direction, mode) {
+  const requestedDate = new Date(requestedAt);
+  const requestedKey = toServiceKey(requestedDate);
+  const requestedMinute = requestedDate.getHours() * 60 + requestedDate.getMinutes();
+  let best = null;
+
+  for (let offset = 0; offset <= 14; offset++) {
+    const date = new Date(requestedDate.getFullYear(), requestedDate.getMonth(), requestedDate.getDate() + offset * direction);
+    const key = toServiceKey(date);
+    const route = direction < 0
+      ? findLatestArrivalRoute(originId, targetId, key === requestedKey ? requestedMinute : 24 * 60 - 1, key)
+      : findEarliestRoute(originId, targetId, key === requestedKey ? requestedMinute : 0, key);
+    if (!route) continue;
+
+    const routeMinute = mode === "arrive" ? route.arrive : route.depart;
+    const routeAt = date.getTime() + routeMinute * 60 * 1000;
+    if ((direction < 0 && routeAt > requestedAt) || (direction > 0 && routeAt < requestedAt)) continue;
+    const distanceMinutes = Math.abs(routeAt - requestedAt) / 60000;
+    const candidate = { date, route, distanceMinutes };
+    if (!best || candidate.distanceMinutes < best.distanceMinutes) best = candidate;
+    break;
+  }
+
+  return best;
+}
+
+function renderSuggestionLine(label, suggestion) {
+  return `<p>${escapeHtml(label)}: <strong>${formatServiceDate(suggestion.date)} ${formatTime(suggestion.route.depart)}発 → ${formatTime(suggestion.route.arrive)}着</strong>（指定から約${Math.round(suggestion.distanceMinutes)}分）</p>`;
+}
+
+function describeServiceWindow(originId, targetId, serviceKey) {
+  const startDate = keyToDate(serviceKey);
+  const windows = [];
+  for (let offset = 0; offset <= 13 && windows.length < 3; offset++) {
+    const date = new Date(startDate.getTime() + offset * DAY_MS);
+    const key = toServiceKey(date);
+    const starts = candidateStartTimes(originId, key);
+    const routes = [];
+    for (const start of starts) {
+      const route = findEarliestRoute(originId, targetId, start, key);
+      if (route) routes.push(route);
+    }
+    if (!routes.length) continue;
+    routes.sort((a, b) => a.depart - b.depart);
+    windows.push(`${formatServiceDate(date)}は、おおむね${formatTime(routes[0].depart)}発から${formatTime(routes[routes.length - 1].depart)}発まで候補があります`);
+  }
+  return windows.length ? `規定の運行日時・時間: ${windows.join("。")}。` : "規定の運行日時・時間: この区間では確認できる運行候補がありません。";
+}
+
 function findServiceSuggestion(originId, targetId, serviceKey, minute, mode) {
   const startDate = keyToDate(serviceKey);
-  if (mode === "arrive") {
-    for (let offset = 0; offset <= 14; offset++) {
-      const date = new Date(startDate.getTime() - offset * DAY_MS);
-      const key = toServiceKey(date);
-      const targetMinute = offset === 0 ? minute : 24 * 60 - 1;
-      const route = findLatestArrivalRoute(originId, targetId, targetMinute, key);
-      if (route) return { date, route, mode: "arrive" };
-    }
-  } else {
-    for (let offset = 0; offset <= 14; offset++) {
-      const date = new Date(startDate.getTime() + offset * DAY_MS);
-      const key = toServiceKey(date);
-      const startMinute = offset === 0 ? minute : 0;
-      const route = findEarliestRoute(originId, targetId, startMinute, key);
-      if (route) return { date, route, mode: "depart" };
-    }
-  }
-  return null;
+  const requestedAt = startDate.getTime() + minute * 60 * 1000;
+  const before = findNearestRouteAround(originId, targetId, requestedAt, -1, mode);
+  const after = findNearestRouteAround(originId, targetId, requestedAt, 1, mode);
+  const best = [before, after].filter(Boolean).sort((a, b) => a.distanceMinutes - b.distanceMinutes)[0] || null;
+  return { before, after, best, service: describeServiceWindow(originId, targetId, serviceKey) };
 }
 
 function renderNoService(fromStop, toStop, serviceKey, minute, mode, suggestion) {
   const label = mode === "arrive" ? "到着" : "出発";
   const requested = `${formatServiceDate(keyToDate(serviceKey))} ${formatTime(minute)} ${label}`;
-  const next = suggestion
-    ? `<p>利用できる候補: <strong>${formatServiceDate(suggestion.date)} ${formatTime(suggestion.route.depart)}発 → ${formatTime(suggestion.route.arrive)}着</strong></p>`
-    : "<p>前後14日以内に候補が見つかりませんでした。</p>";
+  const previous = suggestion?.before ? renderSuggestionLine("指定日時より前の近い候補", suggestion.before) : "";
+  const next = suggestion?.after ? renderSuggestionLine("指定日時より後の近い候補", suggestion.after) : "";
+  const nearest = suggestion?.best ? renderSuggestionLine("最も近い候補", suggestion.best) : "<p>前後14日以内に候補が見つかりませんでした。</p>";
+  const service = suggestion?.service ? `<p class="leg-detail">${escapeHtml(suggestion.service)}</p>` : "";
   el.results.innerHTML = `
     <div class="route-card">
       <div class="notice danger">
         <strong>指定日時では運行候補がありません。</strong>
         <p>${escapeHtml(fromStop.name)} から ${escapeHtml(toStop.name)} へ、${requested} で検索しました。</p>
+        ${nearest}
+        ${previous}
         ${next}
       </div>
+      ${service}
       <p class="leg-detail">運休日、始発前、最終便後、または乗継が成立しない時間帯の可能性があります。</p>
     </div>`;
 }
@@ -607,6 +648,10 @@ function resolveStop(name) {
 
 function getTimeMode() {
   return document.querySelector('input[name="timeMode"]:checked')?.value || "depart";
+}
+
+function updateTimeModeLabel() {
+  el.timeLabel.textContent = getTimeMode() === "arrive" ? "到着時刻" : "出発時刻";
 }
 
 function routeClass(name) {
