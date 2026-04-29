@@ -22,29 +22,42 @@
     </section>
 
     <section class="planner">
+      <div class="mode-row" role="radiogroup" aria-label="検索方法">
+        <label class="mode-pill">
+          <input type="radio" name="timeMode" value="depart" checked>
+          <span>出発時刻で検索</span>
+        </label>
+        <label class="mode-pill">
+          <input type="radio" name="timeMode" value="arrive">
+          <span>到着時刻で検索</span>
+        </label>
+      </div>
+
       <div class="form-grid">
         <label>
           <span>出発停留所</span>
-          <input id="fromStop" list="stopList" placeholder="例: 中部興産沖縄市役所前" autocomplete="off">
+          <input id="fromStop" list="stopList" placeholder="路線図や一覧から選択できます" autocomplete="off">
         </label>
         <label>
           <span>到着停留所</span>
-          <input id="toStop" list="stopList" placeholder="例: 泡瀬" autocomplete="off">
+          <input id="toStop" list="stopList" placeholder="路線図や一覧から選択できます" autocomplete="off">
         </label>
         <label>
           <span>利用日</span>
           <input id="serviceDate" type="date">
         </label>
         <label>
-          <span>出発時刻</span>
+          <span id="timeLabel">出発時刻</span>
           <input id="departTime" type="time" step="60">
         </label>
       </div>
       <datalist id="stopList"></datalist>
 
       <div class="actions">
-        <button id="swapBtn" type="button" title="出発と到着を入れ替え">入替</button>
-        <button id="searchBtn" type="button">最短ルートを検索</button>
+        <button id="pickFromBtn" class="ghost active-pick" type="button">出発を選択</button>
+        <button id="pickToBtn" class="ghost" type="button">到着を選択</button>
+        <button id="swapBtn" class="ghost" type="button">入替</button>
+        <button id="searchBtn" type="button">ルートを検索</button>
       </div>
 
       <details class="data-tools">
@@ -52,26 +65,43 @@
         <p>
           公式GTFSの自動取得に失敗する場合は、Transitland掲載の
           <a href="https://api3.ottop.org/download/gtfs/ooXuXei4op7y/5000020472115" target="_blank" rel="noreferrer">沖縄市循環バス GTFS ZIP</a>
-          をダウンロードしてここへ読み込んでください。
+          を読み込んでください。
         </p>
         <input id="gtfsFile" type="file" accept=".zip,application/zip">
-        <button id="retryBtn" type="button">公式GTFSを再取得</button>
+        <button id="retryBtn" class="ghost" type="button">公式GTFSを再取得</button>
       </details>
     </section>
 
-    <section class="results" id="results" aria-live="polite">
-      <div class="empty">
-        出発地・目的地・時刻を選ぶと、乗継候補と移動時間を表示します。
+    <section class="map-section">
+      <div class="section-head">
+        <div>
+          <h2>路線図から選ぶ</h2>
+          <p>路線を選ぶと停留所一覧が絞り込まれます。地図上の点や一覧の停留所を押すと、出発または到着に入ります。</p>
+        </div>
+        <div class="route-tabs" id="routeTabs"></div>
       </div>
+      <div class="map-layout">
+        <div class="route-map" id="routeMap" aria-label="循環バス路線図"></div>
+        <div class="stop-panel">
+          <div class="stop-panel-head">
+            <strong id="stopPanelTitle">停留所一覧</strong>
+            <input id="stopFilter" placeholder="停留所を絞り込み" autocomplete="off">
+          </div>
+          <div class="stop-list" id="stopButtons"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="results" id="results" aria-live="polite">
+      <div class="empty">出発地・目的地・日時を選ぶと、乗継候補と移動時間を表示します。</div>
     </section>
 
     <section class="notes">
       <h2>運行メモ</h2>
       <ul>
-        <li>公式ページでは、北部・中部・西部・東部の4ルートで運行と案内されています。</li>
-        <li>日曜、祝日、1月1日から1月3日は運休、土曜日は1便の運行なしとされています。</li>
-        <li>無料乗継券は「中部興産沖縄市役所前」「BCコザ（市立図書館）」「ミュージックタウン」「美里市営住宅前」↔「美原4丁目」で案内されています。</li>
-        <li>道路状況やイベント迂回で遅れる場合があります。最終判断は現地の案内・運行事業者の情報も確認してください。</li>
+        <li>北部・中部・西部・東部の4ルートをGTFSデータから読み込みます。</li>
+        <li>運休日や運行時間外の場合は、次に利用できる候補日時を表示します。</li>
+        <li>道路状況やイベント迂回による遅れは反映していません。最終判断は現地案内も確認してください。</li>
       </ul>
     </section>
   </main>
